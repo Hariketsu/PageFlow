@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild -project PageFlow.xcodeproj -scheme "PageFlow Direct" \
+            -configuration Release-Direct -destination 'generic/platform=macOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+
+      - name: Ad-hoc sign, zip and hash
+        run: |
+          APP=build/Build/Products/Release-Direct/PageFlow.app
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+          lipo -archs "$APP/Contents/MacOS/PageFlow"
+          ditto -c -k --keepParent "$APP" PageFlow.zip
+          shasum -a 256 PageFlow.zip | tee PageFlow.zip.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PageFlow-3.0
+          path: |
+            PageFlow.zip
+            PageFlow.zip.sha256
